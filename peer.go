@@ -170,7 +170,7 @@ func (peer *Peer) ParseData() {
 				log.Debugf("Piece")
 				var pieceMsg messages.Piece
 				err = binary.Read(bytes.NewBuffer(data), binary.BigEndian, &pieceMsg)
-				pieceMsg.BlockData = data[:message.Length - 9]
+				pieceMsg.BlockData = data[:message.Length-9]
 
 				log.Debugf("Peer %v - Found a new block - PieceIndex: %v BlockOffset: %v", peer.Addr.String(), pieceMsg.PieceIndex, pieceMsg.BlockOffset)
 
