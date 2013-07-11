@@ -187,3 +187,14 @@ func TestString(t *testing.T) {
 		t.Errorf("ba.String() == %v, want %v", value, expected)
 	}
 }
+
+func TestStringConstructor(t *testing.T) {
+	expected := "01010101011111"
+
+	ba := NewFromString(expected)
+	value := ba.String()
+
+	if value != expected {
+		t.Errorf("NewFromString(01010101011111).String() == %v, want %v", value, expected)
+	}
+}

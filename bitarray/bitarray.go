@@ -48,19 +48,33 @@ func NewFromBytes(bytes []byte, length int) *BitArray {
 	return bitArray
 }
 
+func NewFromString(bits string) *BitArray {
+	bit := map[rune]bool{
+		'0': false,
+		'1': true,
+	}
+
+	bitArray := New(len(bits))
+	for i, c := range bits {
+		value := bit[c]
+		bitArray.bits[i] = value
+	}
+	return bitArray
+}
+
 func (bitArray *BitArray) Len() int {
 	return len(bitArray.bits)
 }
 
 func (bitArray *BitArray) Get(index int) bool {
-	if index < 0 || index >= len(bitArray.bits) {
+	if index < 0 || index >= bitArray.Len() {
 		panic("Out of range")
 	}
 	return bitArray.bits[index]
 }
 
 func (bitArray *BitArray) Set(index int, value bool) {
-	if index < 0 || index >= len(bitArray.bits) {
+	if index < 0 || index >= bitArray.Len() {
 		panic("Out of range")
 	}
 
@@ -69,7 +83,8 @@ func (bitArray *BitArray) Set(index int, value bool) {
 
 func (bitArray *BitArray) Cardinality() int {
 	count := 0
-	for i := 0; i < len(bitArray.bits); i++ {
+	length := bitArray.Len()
+	for i := 0; i < length; i++ {
 		if bitArray.bits[i] {
 			count++
 		}
@@ -90,16 +105,67 @@ func (bitArray *BitArray) UnsetIndices() []int {
 }
 
 func (bitArray *BitArray) indices(predicate func(value bool) bool) []int {
-	length := len(bitArray.bits)
+	length := bitArray.Len()
 	set := make([]int, length)
 	count := 0
-	for i := 0; i < len(bitArray.bits); i++ {
+	for i := 0; i < length; i++ {
 		if predicate(bitArray.bits[i]) {
 			set[count] = i
 			count++
 		}
 	}
 	return set[:count]
+}
+
+func (bitArray *BitArray) And(other *BitArray) *BitArray {
+	if other == nil {
+		panic("Argument null: other")
+	}
+
+	length := bitArray.Len()
+	if length != other.Len() {
+		panic("Lenghts must be equal")
+	}
+
+	result := New(length)
+	for i := 0; i < length; i++ {
+		result.bits[i] = bitArray.bits[i] && other.bits[i]
+	}
+	return result
+}
+
+func (bitArray *BitArray) Xor(other *BitArray) *BitArray {
+	if other == nil {
+		panic("Argument null: other")
+	}
+
+	length := bitArray.Len()
+	if length != other.Len() {
+		panic("Lenghts must be equal")
+	}
+
+	result := New(length)
+	for i := 0; i < length; i++ {
+		result.bits[i] = bitArray.bits[i] != other.bits[i]
+	}
+	return result
+}
+
+func (bitArray *BitArray) Or(other *BitArray) *BitArray {
+	if other == nil {
+		panic("Argument null: other")
+	}
+
+	length := bitArray.Len()
+	if length != other.Len() {
+		panic("Lenghts must be equal")
+	}
+
+	result := New(length)
+	for i := 0; i < length; i++ {
+		result.bits[i] = bitArray.bits[i] || other.bits[i]
+	}
+	return result
 }
 
 func (bitArray *BitArray) String() string {
