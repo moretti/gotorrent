@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	PieceChunkLenght = 1024 * 16
+	PieceChunkLength = 1024 * 16
 )
 
 type Piece struct {
@@ -21,7 +21,7 @@ type Piece struct {
 func NewPiece(index, offset, length int, hash string, file *File) *Piece {
 	p := new(Piece)
 
-	p.Complete = bitarray.New(length / PieceChunkLenght)
+	p.Complete = bitarray.New(length / PieceChunkLength)
 	p.Requested = bitarray.New(p.Complete.Len())
 
 	p.File = file

@@ -107,10 +107,10 @@ type Request struct {
 	Header      Message
 	PieceIndex  uint32
 	BlockOffset uint32
-	BlockLenght uint32
+	BlockLength uint32
 }
 
-func NewRequest(pieceIndex, blockOffset, blockLenght uint32) *Request {
+func NewRequest(pieceIndex, blockOffset, blockLength uint32) *Request {
 	r := Request{
 		Header: Message{
 			Length: RequestLength,
@@ -118,7 +118,7 @@ func NewRequest(pieceIndex, blockOffset, blockLenght uint32) *Request {
 		},
 		PieceIndex:  pieceIndex,
 		BlockOffset: blockOffset,
-		BlockLenght: blockLenght,
+		BlockLength: blockLength,
 	}
 	return &r
 }
@@ -136,5 +136,5 @@ type Cancel struct {
 	Header      Message
 	PieceIndex  uint32
 	BlockOffset uint32
-	BlockLenght uint32
+	BlockLength uint32
 }

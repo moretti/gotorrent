@@ -124,7 +124,7 @@ func (bitArray *BitArray) And(other *BitArray) *BitArray {
 
 	length := bitArray.Len()
 	if length != other.Len() {
-		panic("Lenghts must be equal")
+		panic("Lengths must be equal")
 	}
 
 	result := New(length)
@@ -141,7 +141,7 @@ func (bitArray *BitArray) Xor(other *BitArray) *BitArray {
 
 	length := bitArray.Len()
 	if length != other.Len() {
-		panic("Lenghts must be equal")
+		panic("Lengths must be equal")
 	}
 
 	result := New(length)
@@ -158,7 +158,7 @@ func (bitArray *BitArray) Or(other *BitArray) *BitArray {
 
 	length := bitArray.Len()
 	if length != other.Len() {
-		panic("Lenghts must be equal")
+		panic("Lengths must be equal")
 	}
 
 	result := New(length)

@@ -162,7 +162,7 @@ func test(peer *Peer, torrent *Torrent) (err error) {
 	if err != nil {
 		log.Errorf("%v", err)
 	}
-	err = peer.RequestBlock(300, 0, uint32(PieceChunkLenght))
+	err = peer.RequestBlock(300, 0, uint32(PieceChunkLength))
 	if err != nil {
 		log.Errorf("%v", err)
 	}

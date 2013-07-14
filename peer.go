@@ -73,8 +73,8 @@ func (peer *Peer) ReadHandshake() (err error) {
 	return err
 }
 
-func (peer *Peer) RequestBlock(pieceIndex, blockOffset, blockLenght uint32) (err error) {
-	req := messages.NewRequest(pieceIndex, blockOffset, blockLenght)
+func (peer *Peer) RequestBlock(pieceIndex, blockOffset, blockLength uint32) (err error) {
+	req := messages.NewRequest(pieceIndex, blockOffset, blockLength)
 	err = binary.Write(peer.Conn, binary.BigEndian, req)
 	return
 }
@@ -110,7 +110,7 @@ func (peer *Peer) ParseData() {
 			/*peer.SendUnchoke()
 			peer.SendInterested()
 			log.Debugf("Trying to request piece #%v", i)
-			peer.RequestBlock(300, 0, uint32(PieceChunkLenght))
+			peer.RequestBlock(300, 0, uint32(PieceChunkLength))
 			peer.ReceiveData()
 			i++*/
 		}
