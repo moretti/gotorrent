@@ -76,52 +76,28 @@ func (pm *PeerManager) addPeer(peerAddr net.TCPAddr) {
 
 func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 	message := peerMessage.Message
+	data := peerMessage.Message.Data
 
-	if message.Length == 0 {
-		log.Debugf("Keep alive")
+	peer, ok := pm.Peers[peerMessage.Addr.String()]
+	if !ok {
+		log.Errorf("Unable to find peer %v", peerMessage.Addr)
+	}
+
+	if message.Header.Length == 0 {
+		peer.SetKeepAlive()
 	} else {
-		switch message.Id {
+		switch message.Header.Id {
 		case messages.ChokeId:
-			log.Debugf("Choke")
+			peer.SetChoke()
 		case messages.UnchokeId:
-			log.Debugf("Unchoke")
+			peer.SetUnchoke()
 		case messages.InterestedId:
-			log.Debugf("Interested")
 		case messages.NotInterestedId:
-			log.Debugf("NotInterested")
 		case messages.HaveId:
-			log.Debugf("Have")
-			/*var haveMsg messages.Have
-			err = binary.Read(bytes.NewBuffer(data), binary.BigEndian, &haveMsg)
-			if err != nil
-			SendChannelMessage(haveMsg)
-
-				log.Debugf("Peer %v - Have piece #%v", pc.Addr.String(), haveMsg.PieceIndex)
-
-				if haveMsg.PieceIndex > pc.PieceCount {
-					log.Errorf("Invalid piece index, piece index: %v, piece count: %v", haveMsg.PieceIndex, pc.PieceCount)
-					break
-				}
-
-				pc.BitField.Set(int(haveMsg.PieceIndex), true)
-				log.Debugf("Peer %v - BitField updated", pc.Addr.String())*/
+			peer.SetHave(data)
 		case messages.BitFieldId:
-			log.Debugf("BitField")
-			/*
-
-				var bitMsg messages.BitArray
-				err = binary.Read(bytes.NewBuffer(data), binary.BigEndian, &bitMsg)
-				bitMsg.BitField = data[:message.Length-1]
-
-				bitCount := (message.Length - 1) * 8
-				if pc.PieceCount > bitCount {
-					log.Errorf("Invalid BitField, bit count: %v, piece count: %v", bitCount, pc.PieceCount)
-					break
-				}
-				pc.BitField = bitarray.NewFromBytes(bitMsg.BitField, int(pc.PieceCount))
-				log.Debugf("Peer %v - New BitField:", pc.Addr.String())*/
+			peer.SetBitField(data)
 		case messages.RequestId:
-			log.Debugf("Request")
 		case messages.PieceId:
 			log.Debugf("Piece")
 			/*var pieceMsg messages.Piece
@@ -130,9 +106,7 @@ func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 
 			log.Debugf("Peer %v - Found a new block - PieceIndex: %v BlockOffset: %v", pc.Addr.String(), pieceMsg.PieceIndex, pieceMsg.BlockOffset)*/
 		case messages.CancelId:
-			log.Debugf("Cancel")
 		case messages.PortId:
-			log.Debugf("Port")
 		}
 	}
 }

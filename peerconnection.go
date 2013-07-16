@@ -111,21 +111,23 @@ func (pc *PeerConnection) reader() {
 
 func (pc *PeerConnection) parseData() {
 	var message messages.Message
-	err := binary.Read(bytes.NewBuffer(pc.data[:4]), binary.BigEndian, &message.Length)
+	err := binary.Read(bytes.NewBuffer(pc.data[:4]), binary.BigEndian, &message.Header.Length)
 	if err != nil {
 		log.Errorf("Cannot read the message length: %v", err)
 	}
 
-	if int(message.Length) > len(pc.data) {
+	if int(message.Header.Length) > len(pc.data) {
 		return
 	}
 
+	message.Data = pc.data[:4]
 	pc.data = pc.data[4:]
 
-	if message.Length > 0 {
-		message.Id = pc.data[0]
-		message.Payload = pc.data[1:message.Length]
-		pc.data = pc.data[message.Length:]
+	if message.Header.Length > 0 {
+		message.Header.Id = pc.data[0]
+		message.Data = append(message.Data, pc.data[:message.Header.Length]...)
+
+		pc.data = pc.data[message.Header.Length:]
 	}
 	pc.outMessage(message)
 }
