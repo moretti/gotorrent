@@ -65,16 +65,20 @@ func (hand *Handshake) String() string {
 }
 
 // message: <length prefix><message ID><payload>
-// not interested: <len=0001><id=3>
 type Message struct {
+	Length  uint32
+	Id      byte
+	Payload []byte
+}
+
+type Header struct {
 	Length uint32
 	Id     byte
-	//payload []byte
 }
 
 // unchoke: <len=0001><id=1>
-func NewUnchoke() *Message {
-	u := Message{
+func NewUnchoke() *Header {
+	u := Header{
 		Length: UnchokeLength,
 		Id:     UnchokeId,
 	}
@@ -82,29 +86,31 @@ func NewUnchoke() *Message {
 }
 
 // interested: <len=0001><id=2>
-func NewInterested() *Message {
-	u := Message{
+func NewInterested() *Header {
+	u := Header{
 		Length: InterestedLength,
 		Id:     InterestedId,
 	}
 	return &u
 }
 
+// not interested: <len=0001><id=3>
+
 // have: <len=0005><id=4><piece index>
 type Have struct {
-	Header     Message
+	Header     Header
 	PieceIndex uint32
 }
 
 // bitArray: <len=0001+X><id=5><bitArray>
 type BitArray struct {
-	Header   Message
+	Header   Header
 	BitField []byte
 }
 
 // request: <len=0013><id=6><index><begin><length>
 type Request struct {
-	Header      Message
+	Header      Header
 	PieceIndex  uint32
 	BlockOffset uint32
 	BlockLength uint32
@@ -112,7 +118,7 @@ type Request struct {
 
 func NewRequest(pieceIndex, blockOffset, blockLength uint32) *Request {
 	r := Request{
-		Header: Message{
+		Header: Header{
 			Length: RequestLength,
 			Id:     RequestId,
 		},
@@ -125,7 +131,7 @@ func NewRequest(pieceIndex, blockOffset, blockLength uint32) *Request {
 
 // piece: <len=0009+X><id=7><index><begin><block>
 type Piece struct {
-	Header      Message
+	Header      Header
 	PieceIndex  uint32
 	BlockOffset uint32
 	BlockData   []byte
@@ -133,7 +139,7 @@ type Piece struct {
 
 // cancel: <len=0013><id=8><index><begin><length>
 type Cancel struct {
-	Header      Message
+	Header      Header
 	PieceIndex  uint32
 	BlockOffset uint32
 	BlockLength uint32
