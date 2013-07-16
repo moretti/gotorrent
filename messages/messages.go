@@ -64,16 +64,14 @@ func (hand *Handshake) String() string {
 	return buffer.String()
 }
 
-// message: <length prefix><message ID><payload>
-type Message struct {
-	Length  uint32
-	Id      byte
-	Payload []byte
-}
-
 type Header struct {
 	Length uint32
 	Id     byte
+}
+
+type Message struct {
+	Header Header
+	Data   []byte // Data represents the whole message in binary form, including Length and Id
 }
 
 // unchoke: <len=0001><id=1>
