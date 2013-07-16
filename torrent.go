@@ -4,7 +4,6 @@ import (
 	log "code.google.com/p/tcgl/applog"
 	"github.com/moretti/gotorrent/bitarray"
 	"github.com/moretti/gotorrent/metainfo"
-	"net"
 	"os"
 	"strings"
 	"time"
@@ -19,8 +18,9 @@ type Torrent struct {
 	Uploaded   int
 
 	//Pieces []Piece
-	Peers   []*Peer
-	Tracker *Tracker
+	//Peers   []*Peer
+	PeerManager *PeerManager
+	Tracker     *Tracker
 
 	IsComplete bool
 	BitField   *bitarray.BitArray
@@ -57,6 +57,7 @@ func NewTorrent(clientId ClientId, port int, torrent string, downloadPath string
 
 	t.BitField = bitarray.New(t.PieceCount)
 	t.Tracker = NewTracker(t.Announce)
+	t.PeerManager = NewPeerManager(t)
 
 	log.Debugf("File Length: %v", t.Length)
 	log.Debugf("Piece Length: %v", t.PieceLength)
@@ -93,7 +94,7 @@ func readTorrent(torrent string) *metainfo.MetaInfo {
 	}
 }
 
-func (torrent *Torrent) UpdatePeers() {
+/*func (torrent *Torrent) UpdatePeers() {
 	trackerResponse, err := torrent.Tracker.Peers(
 		torrent.InfoHash,
 		torrent.ClientId,
@@ -118,9 +119,9 @@ func (torrent *Torrent) UpdatePeers() {
 			torrent.AddPeer(peerAddr)
 		}
 	}
-}
+}*/
 
-func (torrent *Torrent) AddPeer(peerAddr net.TCPAddr) {
+/*func (torrent *Torrent) AddPeer(peerAddr net.TCPAddr) {
 	peer := Peer{
 		Addr:        peerAddr,
 		PieceLength: uint32(torrent.PieceLength),
@@ -174,5 +175,24 @@ func test(peer *Peer, torrent *Torrent) (err error) {
 		log.Errorf("%v", err)
 	}
 	peer.ParseData()
+	return
+}*/
+
+func (torrent *Torrent) Test() (err error) {
+	//panic("Not implemented yet!")
+	trackerResponse, err := torrent.Tracker.Peers(
+		torrent.InfoHash,
+		torrent.ClientId,
+		torrent.Port,
+		torrent.Uploaded,
+		torrent.Downloaded,
+		torrent.Length,
+	)
+
+	log.Debugf("Len of addr: %v", len(trackerResponse.PeerAddresses))
+	torrent.PeerManager.UpdatePeers(trackerResponse.PeerAddresses)
+
+	time.Sleep(240 * time.Second)
+
 	return
 }
