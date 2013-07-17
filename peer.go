@@ -10,12 +10,12 @@ import (
 )
 
 type Peer struct {
-	Connection *PeerConnection
-	Torrent    *Torrent
+	connection *PeerConnection
+	torrent    *Torrent
 
-	BitField   *bitarray.BitArray
-	Interested bool
-	Choked     bool
+	bitField   *bitarray.BitArray
+	interested bool
+	choked     bool
 }
 
 func NewPeer(
@@ -26,50 +26,50 @@ func NewPeer(
 ) *Peer {
 
 	p := new(Peer)
-	p.Torrent = torrent
-	p.Connection = NewPeerConnection(addr, peerErrors, outMessages)
+	p.torrent = torrent
+	p.connection = NewPeerConnection(addr, peerErrors, outMessages)
 
-	p.BitField = bitarray.New(p.Torrent.PieceCount)
-	p.Interested = false
-	p.Choked = true
+	p.bitField = bitarray.New(p.torrent.PieceCount)
+	p.interested = false
+	p.choked = true
 
 	return p
 }
 
 func (p *Peer) String() string {
-	return p.Connection.addr.String()
+	return p.connection.addr.String()
 }
 
 func (p *Peer) Connect() {
 	go func() {
-		p.Connection.Connect()
-		p.SendHandshake(p.Torrent.InfoHash, string(p.Torrent.ClientId))
+		p.connection.Connect()
+		p.SendHandshake(p.torrent.InfoHash, string(p.torrent.ClientId))
 		p.SendUnchoke()
 		p.SendInterested()
 	}()
 }
 
 func (p *Peer) SendUnchoke() {
-	p.Connection.SendMessage(messages.NewUnchoke())
+	p.connection.SendMessage(messages.NewUnchoke())
 }
 
 func (p *Peer) SendInterested() {
-	p.Connection.SendMessage(messages.NewInterested())
+	p.connection.SendMessage(messages.NewInterested())
 }
 
 func (p *Peer) SendHandshake(infoHash, peerId string) {
-	p.Connection.SendMessage(messages.NewHandshake(infoHash, peerId))
+	p.connection.SendMessage(messages.NewHandshake(infoHash, peerId))
 }
 
 func (p *Peer) SetKeepAlive() {
 }
 
 func (p *Peer) SetChoke() {
-	p.Choked = true
+	p.choked = true
 }
 
 func (p *Peer) SetUnchoke() {
-	p.Choked = false
+	p.choked = false
 }
 
 func (p *Peer) SetHave(message []byte) {
@@ -81,18 +81,13 @@ func (p *Peer) SetHave(message []byte) {
 		return
 	}
 
-	if p.BitField == nil {
-		log.Errorf("Peer %v - Bitfield not initialized yet", p.String())
-		return
-	}
-
-	if int(haveMsg.PieceIndex) >= p.BitField.Len() {
-		log.Errorf("Peer %v - Invalid piece index: %v, piece count: %v", haveMsg.PieceIndex, p.BitField.Len())
+	if int(haveMsg.PieceIndex) >= p.bitField.Len() {
+		log.Errorf("Peer %v - Invalid piece index: %v, piece count: %v", haveMsg.PieceIndex, p.bitField.Len())
 		return
 	}
 
 	log.Debugf("Peer %v - Have piece #%v", p.String(), haveMsg.PieceIndex)
-	p.BitField.Set(int(haveMsg.PieceIndex), true)
+	p.bitField.Set(int(haveMsg.PieceIndex))
 }
 
 func (p *Peer) SetBitField(message []byte) {
@@ -104,13 +99,18 @@ func (p *Peer) SetBitField(message []byte) {
 		return
 	}
 
-	bitMsg.BitField = message[:bitMsg.Header.Length-1]
-	pieceCount := p.Torrent.PieceCount
+	begin := 5
+	bitMsg.BitField = message[begin:]
+	pieceCount := p.torrent.PieceCount
 
 	if bitCount := (bitMsg.Header.Length - 1) * 8; pieceCount > int(bitCount) {
 		log.Errorf("Peer %v - Invalid BitField, bit count: %v, piece count: %v", p.String(), bitCount, pieceCount)
 		return
 	}
-	p.BitField = bitarray.NewFromBytes(bitMsg.BitField, pieceCount)
+	p.bitField = bitarray.NewFromBytes(bitMsg.BitField, pieceCount)
 	log.Debugf("Peer %v - New BitField:", p.String())
+}
+
+func (p *Peer) BitField() *bitarray.BitArray {
+	return p.bitField
 }
