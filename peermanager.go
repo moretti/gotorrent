@@ -10,8 +10,6 @@ type PeerManager struct {
 	Torrent *Torrent
 	Peers   map[string]*Peer
 
-	PiecesCount []int
-
 	AddPeerAddr chan net.TCPAddr
 	RemovePeer  chan Peer
 
@@ -47,12 +45,10 @@ func (pm *PeerManager) manage() {
 		case <-pm.Quit:
 			log.Debugf("Quitting...")
 			return
-		case message := <-pm.InMessages:
-			pm.processMessage(message)
-		case err := <-pm.Errors:
-			log.Errorf("Peer %v: %v", err.Addr.String(), err.Err)
-			/*case <-pm.removePeer:
-			panic("Not implemented")*/
+		case peerMessage := <-pm.InMessages:
+			pm.processMessage(peerMessage)
+		case peerError := <-pm.Errors:
+			pm.handleError(peerError)
 		}
 	}
 }
@@ -72,6 +68,11 @@ func (pm *PeerManager) addPeer(peerAddr net.TCPAddr) {
 
 		peer.Connect()
 	}
+}
+
+func (pm *PeerManager) handleError(peerError PeerError) {
+	log.Errorf("Peer %v: %v", peerError.Addr.String(), peerError.Err)
+	delete(pm.Peers, peerError.Addr.String())
 }
 
 func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
