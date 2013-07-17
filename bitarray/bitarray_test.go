@@ -20,7 +20,7 @@ func TestLenConstructor(t *testing.T) {
 		expected := false
 
 		for i := 0; i < ba.Len(); i++ {
-			value := ba.Get(0)
+			value := ba.IsSet(0)
 			if value != expected {
 				t.Errorf("ba.Get(%v) == %v, want %v", i, value, expected)
 			}
@@ -36,10 +36,10 @@ func TestGetSet(t *testing.T) {
 		expected := true
 
 		for i := range indexes {
-			ba.Set(i, expected)
-			value := ba.Get(i)
+			ba.Set(i)
+			value := ba.IsSet(i)
 			if value != expected {
-				t.Errorf("ba.Get(%v) == %v, want %v", i, value, expected)
+				t.Errorf("ba.IsSet(%v) == %v, want %v", i, value, expected)
 			}
 		}
 	}
@@ -77,9 +77,9 @@ func TestByteConstructor(t *testing.T) {
 		}
 
 		for i, expected := range values {
-			value := ba.Get(i)
+			value := ba.IsSet(i)
 			if value != expected {
-				t.Errorf("ba.Get(%v) == %v, want %v", i, value, expected)
+				t.Errorf("ba.IsSet(%v) == %v, want %v", i, value, expected)
 			}
 		}
 	}
@@ -117,9 +117,9 @@ func TestByteConstructorPartialBytes(t *testing.T) {
 		}
 
 		for i, expected := range values {
-			value := ba.Get(i)
+			value := ba.IsSet(i)
 			if value != expected {
-				t.Errorf("ba.Get(%v) == %v, want %v", i, value, expected)
+				t.Errorf("ba.IsSet(%v) == %v, want %v", i, value, expected)
 			}
 		}
 	}
@@ -177,7 +177,7 @@ func TestString(t *testing.T) {
 	ba := New(10)
 	for i := 0; i < ba.Len(); i++ {
 		if i%2 == 0 {
-			ba.Set(i, true)
+			ba.Set(i)
 		}
 	}
 

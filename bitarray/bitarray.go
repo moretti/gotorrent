@@ -66,19 +66,27 @@ func (bitArray *BitArray) Len() int {
 	return len(bitArray.bits)
 }
 
-func (bitArray *BitArray) Get(index int) bool {
+func (bitArray *BitArray) IsSet(index int) bool {
 	if index < 0 || index >= bitArray.Len() {
 		panic("Out of range")
 	}
 	return bitArray.bits[index]
 }
 
-func (bitArray *BitArray) Set(index int, value bool) {
+func (bitArray *BitArray) Set(index int) {
 	if index < 0 || index >= bitArray.Len() {
 		panic("Out of range")
 	}
 
-	bitArray.bits[index] = value
+	bitArray.bits[index] = true
+}
+
+func (bitArray *BitArray) Unset(index int) {
+	if index < 0 || index >= bitArray.Len() {
+		panic("Out of range")
+	}
+
+	bitArray.bits[index] = false
 }
 
 func (bitArray *BitArray) Cardinality() int {
