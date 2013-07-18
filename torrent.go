@@ -52,7 +52,12 @@ func NewTorrent(clientId ClientId, port int, torrent string, downloadPath string
 	t.PieceHashes = metaInfo.Info.Pieces
 	t.PieceLength = metaInfo.Info.PieceLength
 	t.PieceCount = t.Length / t.PieceLength
+
 	t.Pieces = make([]*Piece, t.PieceCount)
+	for i := 0; i < t.PieceCount; i++ {
+		hashIndex := i * 20
+		t.Pieces[i] = NewPiece(i, t.PieceLength, t.PieceHashes[hashIndex:hashIndex+20])
+	}
 
 	t.ActivePieces = bitarray.New(t.PieceCount)
 	t.CompletedPieces = bitarray.New(t.PieceCount)
@@ -62,6 +67,8 @@ func NewTorrent(clientId ClientId, port int, torrent string, downloadPath string
 	log.Debugf("File Length: %v", t.Length)
 	log.Debugf("Piece Length: %v", t.PieceLength)
 	log.Debugf("Piece Count: %v", t.PieceCount)
+	log.Debugf("Piece Hashes: %v", len(t.PieceHashes))
+
 	return t
 }
 
