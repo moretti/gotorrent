@@ -85,14 +85,21 @@ func NewUnchoke() *Header {
 
 // interested: <len=0001><id=2>
 func NewInterested() *Header {
-	u := Header{
+	i := Header{
 		Length: InterestedLength,
 		Id:     InterestedId,
 	}
-	return &u
+	return &i
 }
 
 // not interested: <len=0001><id=3>
+func NewNotInterested() *Header {
+	n := Header{
+		Length: NotInterestedLength,
+		Id:     NotInterestedId,
+	}
+	return &n
+}
 
 // have: <len=0005><id=4><piece index>
 type Have struct {
