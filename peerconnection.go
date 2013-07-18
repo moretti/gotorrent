@@ -162,11 +162,3 @@ func (pc *PeerConnection) readHandshake() (n int, err error) {
 	log.Debugf(hand.String())
 	return
 }
-
-/*
-func (pc *PeerConnection) RequestBlock(pieceIndex, blockOffset, blockLength uint32) (err error) {
-	req := messages.NewRequest(pieceIndex, blockOffset, blockLength)
-	err = binary.Write(pc.Conn, binary.BigEndian, req)
-	return
-}
-*/
