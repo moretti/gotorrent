@@ -88,15 +88,16 @@ func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 	}
 
 	if message.Header.Length == 0 {
+		log.Debugf("Peer %v - Keep alive", peer.String())
 		peer.SetKeepAlive()
 	} else {
 		switch message.Header.Id {
 		case messages.ChokeId:
-			log.Debugf("Peer %v - Chocked: %v", peer.String())
+			log.Debugf("Peer %v - Chocked", peer.String())
 			peer.IsChoked = true
 		case messages.UnchokeId:
 			peer.IsChoked = false
-			log.Debugf("Peer %v - Unchocked: %v", peer.String())
+			log.Debugf("Peer %v - Unchocked", peer.String())
 			pm.downloadPiece(peer)
 		case messages.InterestedId:
 		case messages.NotInterestedId:
@@ -110,6 +111,8 @@ func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 			pm.decodePiece(message, peer)
 		case messages.CancelId:
 		case messages.PortId:
+		default:
+			log.Errorf("Peer %v - Unknown id: %v", peer.String(), message.Header.Id)
 		}
 	}
 }
