@@ -94,3 +94,7 @@ func (p *Piece) IsValid() bool {
 func (p *Piece) Len() int {
 	return p.length
 }
+
+func (p *Piece) Index() int {
+	return p.index
+}
