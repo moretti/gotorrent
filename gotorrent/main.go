@@ -11,6 +11,7 @@ func main() {
 
 	if len(args) != 2 {
 		fmt.Println("Usage: gotorrent torrent_file")
+		return
 	}
 
 	torrentPath := args[1]
