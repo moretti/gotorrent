@@ -13,9 +13,9 @@ type Peer struct {
 	connection *PeerConnection
 	torrent    *Torrent
 
-	bitField   *bitarray.BitArray
-	interested bool
-	choked     bool
+	bitField     *bitarray.BitArray
+	amInterested bool
+	IsChoked     bool
 }
 
 func NewPeer(
@@ -30,8 +30,8 @@ func NewPeer(
 	p.connection = NewPeerConnection(addr, peerErrors, outMessages)
 
 	p.bitField = bitarray.New(p.torrent.PieceCount)
-	p.interested = false
-	p.choked = true
+	p.IsChoked = true
+	p.amInterested = false
 
 	return p
 }
@@ -45,31 +45,34 @@ func (p *Peer) Connect() {
 		p.connection.Connect()
 		p.SendHandshake(p.torrent.InfoHash, string(p.torrent.ClientId))
 		p.SendUnchoke()
-		p.SendInterested()
+		//p.SendInterested()
 	}()
 }
 
 func (p *Peer) SendUnchoke() {
+	log.Debugf("Peer %v - Sending unchoke", p.String())
 	p.connection.SendMessage(messages.NewUnchoke())
 }
 
-func (p *Peer) SendInterested() {
-	p.connection.SendMessage(messages.NewInterested())
+func (p *Peer) SendInterested(interested bool) {
+	if interested {
+		log.Debugf("Peer %v - Sending interested", p.String())
+		p.connection.SendMessage(messages.NewInterested())
+	} else {
+		log.Debugf("Peer %v - Sending not interested", p.String())
+		p.connection.SendMessage(messages.NewNotInterested())
+	}
 }
 
 func (p *Peer) SendHandshake(infoHash, peerId string) {
 	p.connection.SendMessage(messages.NewHandshake(infoHash, peerId))
 }
 
+func (p *Peer) SendRequest(pieceIndex, blockOffset, blockLength int) {
+	p.connection.SendMessage(messages.NewRequest(uint32(pieceIndex), uint32(blockOffset), uint32(blockLength)))
+}
+
 func (p *Peer) SetKeepAlive() {
-}
-
-func (p *Peer) SetChoke() {
-	p.choked = true
-}
-
-func (p *Peer) SetUnchoke() {
-	p.choked = false
 }
 
 func (p *Peer) SetHave(message []byte) {
@@ -104,7 +107,7 @@ func (p *Peer) SetBitField(message []byte) {
 	pieceCount := p.torrent.PieceCount
 
 	if bitCount := (bitMsg.Header.Length - 1) * 8; pieceCount > int(bitCount) {
-		log.Errorf("Peer %v - Invalid BitField, bit count: %v, piece count: %v", p.String(), bitCount, pieceCount)
+		log.Errorf("Peer %v - Invalid bitfield, bit count: %v, piece count: %v", p.String(), bitCount, pieceCount)
 		return
 	}
 	p.bitField = bitarray.NewFromBytes(bitMsg.BitField, pieceCount)
@@ -113,4 +116,28 @@ func (p *Peer) SetBitField(message []byte) {
 
 func (p *Peer) BitField() *bitarray.BitArray {
 	return p.bitField
+}
+
+func (p *Peer) RequestPiece(piece *Piece) {
+	for {
+		block := piece.NextBlock()
+		if block == nil {
+			break
+		}
+		p.SendRequest(piece.Index(), block.Begin, block.Length)
+	}
+}
+
+func (p *Peer) AmInterested(activePieces, completedPieces *bitarray.BitArray) (interested bool, pieces []int) {
+	// pieces = peerHas ^ (peerHas & (active | completed))
+	pieces = p.BitField().Xor(p.bitField.And(activePieces.Or(completedPieces))).SetIndices()
+	interested = len(pieces) > 0
+
+	if interested != p.amInterested {
+		p.SendInterested(interested)
+		p.amInterested = interested
+	}
+
+	log.Debugf("Peer %v - Those are the indices of the pieces that I don't have: %v", p.String(), pieces)
+	return
 }

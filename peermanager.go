@@ -1,8 +1,11 @@
 package gotorrent
 
 import (
+	"bytes"
 	log "code.google.com/p/tcgl/applog"
+	"encoding/binary"
 	"github.com/moretti/gotorrent/messages"
+	"math/rand"
 	"net"
 )
 
@@ -10,8 +13,8 @@ type PeerManager struct {
 	Torrent *Torrent
 	Peers   map[string]*Peer
 
-	AddPeerAddr chan net.TCPAddr
-	RemovePeer  chan Peer
+	AddPeerAddr         chan net.TCPAddr
+	PeerReadyToDownload chan Peer
 
 	Errors     chan PeerError
 	InMessages chan PeerMessage
@@ -25,7 +28,7 @@ func NewPeerManager(torrent *Torrent) *PeerManager {
 	pm.Peers = make(map[string]*Peer)
 
 	pm.AddPeerAddr = make(chan net.TCPAddr)
-	pm.RemovePeer = make(chan Peer)
+	pm.PeerReadyToDownload = make(chan Peer)
 
 	pm.Errors = make(chan PeerError)
 	pm.InMessages = make(chan PeerMessage)
@@ -42,13 +45,13 @@ func (pm *PeerManager) manage() {
 		select {
 		case peerAddr := <-pm.AddPeerAddr:
 			pm.addPeer(peerAddr)
-		case <-pm.Quit:
-			log.Debugf("Quitting...")
-			return
 		case peerMessage := <-pm.InMessages:
 			pm.processMessage(peerMessage)
 		case peerError := <-pm.Errors:
 			pm.handleError(peerError)
+		case <-pm.Quit:
+			log.Debugf("Quitting...")
+			return
 		}
 	}
 }
@@ -89,35 +92,65 @@ func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 	} else {
 		switch message.Header.Id {
 		case messages.ChokeId:
-			peer.SetChoke()
+			log.Debugf("Peer %v - Chocked: %v", peer.String())
+			peer.IsChoked = true
 		case messages.UnchokeId:
-			peer.SetUnchoke()
+			peer.IsChoked = false
+			log.Debugf("Peer %v - Unchocked: %v", peer.String())
+			pm.downloadPiece(peer)
 		case messages.InterestedId:
 		case messages.NotInterestedId:
 		case messages.HaveId:
 			peer.SetHave(data)
+			pm.downloadPiece(peer)
 		case messages.BitFieldId:
 			peer.SetBitField(data)
 		case messages.RequestId:
 		case messages.PieceId:
-			log.Debugf("Piece")
-			/*var pieceMsg messages.Piece
-			err = binary.Read(bytes.NewBuffer(data), binary.BigEndian, &pieceMsg)
-			pieceMsg.BlockData = data[:message.Length-9]
-
-			log.Debugf("Peer %v - Found a new block - PieceIndex: %v BlockOffset: %v", pc.Addr.String(), pieceMsg.PieceIndex, pieceMsg.BlockOffset)*/
+			pm.decodePiece(message, peer)
 		case messages.CancelId:
 		case messages.PortId:
 		}
 	}
 }
 
+func (pm *PeerManager) downloadPiece(peer *Peer) {
+	if peer.IsChoked {
+		return
+	}
+
+	amInterested, pieceIndices := peer.AmInterested(pm.Torrent.ActivePieces, pm.Torrent.CompletedPieces)
+	if !amInterested {
+		return
+	}
+
+	// Choose a random piece that I don't have
+	pieceIndex := randomChoice(pieceIndices)
+	piece := pm.Torrent.Pieces[pieceIndex]
+
+	log.Debugf("Downloading piece #%v from peer %v", pieceIndex, peer.String())
+	peer.RequestPiece(piece)
+}
+
+func (pm *PeerManager) decodePiece(message messages.Message, peer *Peer) {
+	var pieceMsg messages.Piece
+	err := binary.Read(bytes.NewBuffer(message.Data), binary.BigEndian, &pieceMsg)
+	if err != nil {
+		log.Errorf("Peer %v - Unable to parse the piece message: %v", peer.String(), err)
+		return
+	}
+	begin := 9
+	pieceMsg.BlockData = message.Data[begin:]
+	log.Debugf("Peer %v - Found a new block - PieceIndex: %v BlockOffset: %v", peer.String(), pieceMsg.PieceIndex, pieceMsg.BlockOffset)
+}
+
+func randomChoice(slice []int) int {
+	randomIndex := rand.Intn(len(slice))
+	return slice[randomIndex]
+}
+
 func (pm *PeerManager) UpdatePeers(addresses []net.TCPAddr) {
 	for _, peerAddr := range addresses {
 		pm.AddPeerAddr <- peerAddr
 	}
-}
-
-func (PeerManager *PeerManager) DownloadPiece(number int) (err error) {
-	panic("Not implemented")
 }
