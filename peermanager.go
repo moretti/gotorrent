@@ -46,6 +46,7 @@ func (pm *PeerManager) manage() {
 		case peerAddr := <-pm.AddPeerAddr:
 			pm.addPeer(peerAddr)
 		case peerMessage := <-pm.InMessages:
+			//log.Debugf("Receiving message %v from peer %v", peerMessage.Message.Header, peerMessage.Addr)
 			pm.processMessage(peerMessage)
 		case peerError := <-pm.Errors:
 			pm.handleError(peerError)
@@ -106,6 +107,7 @@ func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 			pm.downloadPiece(peer)
 		case messages.BitFieldId:
 			peer.SetBitField(data)
+			pm.downloadPiece(peer)
 		case messages.RequestId:
 		case messages.PieceId:
 			pm.decodePiece(message, peer)
@@ -131,7 +133,7 @@ func (pm *PeerManager) downloadPiece(peer *Peer) {
 	pieceIndex := randomChoice(pieceIndices)
 	piece := pm.Torrent.Pieces[pieceIndex]
 
-	log.Debugf("Downloading piece #%v from peer %v", pieceIndex, peer.String())
+	log.Debugf("Requesting piece #%v to peer %v", pieceIndex, peer.String())
 	peer.RequestPiece(piece)
 }
 

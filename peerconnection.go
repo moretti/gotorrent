@@ -4,6 +4,7 @@ import (
 	"bytes"
 	log "code.google.com/p/tcgl/applog"
 	"encoding/binary"
+	"errors"
 	"github.com/moretti/gotorrent/messages"
 	"io"
 	"net"
@@ -63,7 +64,9 @@ func (pc *PeerConnection) Connect() {
 }
 
 func (pc *PeerConnection) SendMessage(message interface{}) {
-	pc.inMessages <- message
+	go func() {
+		pc.inMessages <- message
+	}()
 }
 
 func (pc *PeerConnection) outError(err error) {
@@ -79,32 +82,39 @@ func (pc *PeerConnection) reader() {
 	n := 0
 	var err error
 	buf := make([]byte, 2048)
+
+	err = pc.readHandshake()
+	if err != nil {
+		log.Debugf("Finished reading from peer %v, err: %v", pc.addr, err)
+		pc.conn.Close()
+	}
+
 	for {
-		if !pc.handshake {
-			n, err = pc.readHandshake()
-		} else {
-			pc.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-			n, err = pc.conn.Read(buf)
-
-			if err == nil {
-				readed := buf[:n]
-				nBytes += n
-
-				pc.data = append(pc.data, readed...)
-
-				if len(pc.data) > 4 {
-					pc.parseData()
-				}
-			}
-		}
+		pc.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		n, err = pc.conn.Read(buf)
 
 		if err != nil && err != io.EOF {
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			} else {
+			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
 				break
 			}
 		}
+
+		readed := buf[:n]
+		//log.Debugf("Peer %v - Readed %v bytes", pc.addr, n)
+
+		nBytes += n
+		pc.data = append(pc.data, readed...)
+
+		//log.Debugf("Peer: %v - Buffer: %v", pc.addr, buf)
+		//log.Debugf("Peer: %v - Readed: %v", pc.addr, readed)
+		//log.Debugf("Peer: %v - Current data: %v", pc.addr, pc.data)
+
+		if len(pc.data) > 4 {
+			//log.Debugf("Peer: %v - Parsing the data", pc.addr)
+			pc.parseData()
+		}
 	}
+
 	log.Debugf("Finished reading from peer %v, err: %v", pc.addr, err)
 	pc.conn.Close()
 }
@@ -117,6 +127,7 @@ func (pc *PeerConnection) parseData() {
 	}
 
 	if int(message.Header.Length) > len(pc.data) {
+		log.Debugf("Peer: %v - I need more data, message length: %v, data length %v", pc.addr, message.Header.Length, len(pc.data))
 		return
 	}
 
@@ -129,6 +140,7 @@ func (pc *PeerConnection) parseData() {
 
 		pc.data = pc.data[message.Header.Length:]
 	}
+	//log.Debugf("Peer: %v - Sending message %v", pc.addr, message.Header)
 	pc.outMessage(message)
 }
 
@@ -143,11 +155,16 @@ func (pc *PeerConnection) writer() {
 	pc.conn.Close()
 }
 
-func (pc *PeerConnection) readHandshake() (n int, err error) {
+func (pc *PeerConnection) readHandshake() (err error) {
 	buf := make([]byte, messages.HandshakeLength)
-	n, err = pc.conn.Read(buf)
+	n, err := pc.conn.Read(buf)
 
-	if err != nil || n != messages.HandshakeLength {
+	if err != nil {
+		return
+	}
+
+	if n != messages.HandshakeLength {
+		err = errors.New("Cannot read the handshake")
 		return
 	}
 
@@ -157,8 +174,6 @@ func (pc *PeerConnection) readHandshake() (n int, err error) {
 		return
 	}
 
-	pc.handshake = true
-	log.Debugf("Handshake from peer %v", pc.addr.String())
-	log.Debugf(hand.String())
+	log.Debugf("Peer %v - Handshake: %v", pc.addr.String(), hand.String())
 	return
 }
