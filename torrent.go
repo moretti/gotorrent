@@ -17,13 +17,12 @@ type Torrent struct {
 	Downloaded int
 	Uploaded   int
 
-	//Pieces []Piece
-	//Peers   []*Peer
+	Pieces      []*Piece
 	PeerManager *PeerManager
 	Tracker     *Tracker
 
-	IsComplete bool
-	BitField   *bitarray.BitArray
+	ActivePieces    *bitarray.BitArray
+	CompletedPieces *bitarray.BitArray
 
 	Announce     string
 	InfoHash     string
@@ -42,7 +41,6 @@ func NewTorrent(clientId ClientId, port int, torrent string, downloadPath string
 	t.DownloadPath = downloadPath
 	t.Downloaded = 0
 	t.Uploaded = 0
-	t.IsComplete = false
 
 	metaInfo := readTorrent(torrent)
 
@@ -54,8 +52,10 @@ func NewTorrent(clientId ClientId, port int, torrent string, downloadPath string
 	t.PieceHashes = metaInfo.Info.Pieces
 	t.PieceLength = metaInfo.Info.PieceLength
 	t.PieceCount = t.Length / t.PieceLength
+	t.Pieces = make([]*Piece, t.PieceCount)
 
-	t.BitField = bitarray.New(t.PieceCount)
+	t.ActivePieces = bitarray.New(t.PieceCount)
+	t.CompletedPieces = bitarray.New(t.PieceCount)
 	t.Tracker = NewTracker(t.Announce)
 	t.PeerManager = NewPeerManager(t)
 
@@ -94,92 +94,7 @@ func readTorrent(torrent string) *metainfo.MetaInfo {
 	}
 }
 
-/*func (torrent *Torrent) UpdatePeers() {
-	trackerResponse, err := torrent.Tracker.Peers(
-		torrent.InfoHash,
-		torrent.ClientId,
-		torrent.Port,
-		torrent.Uploaded,
-		torrent.Downloaded,
-		torrent.Length,
-	)
-
-	if err != nil {
-		log.Errorf("Unable to retrieve the peers: %v", err)
-	}
-
-	addresses := make(map[string]bool)
-	for _, peer := range torrent.Peers {
-		addresses[peer.Addr.String()] = true
-	}
-
-	for _, peerAddr := range trackerResponse.PeerAddresses {
-		if _, ok := addresses[peerAddr.String()]; !ok {
-			log.Debugf("Found Peer: %v", peerAddr)
-			torrent.AddPeer(peerAddr)
-		}
-	}
-}*/
-
-/*func (torrent *Torrent) AddPeer(peerAddr net.TCPAddr) {
-	peer := Peer{
-		Addr:        peerAddr,
-		PieceLength: uint32(torrent.PieceLength),
-		PieceCount:  uint32(torrent.PieceCount),
-		BitField:    bitarray.New(torrent.PieceCount),
-	}
-
-	torrent.Peers = append(torrent.Peers, &peer)
-}
-
 func (torrent *Torrent) Test() (err error) {
-	torrent.UpdatePeers()
-
-	for _, peer := range torrent.Peers {
-		go test(peer, torrent)
-	}
-
-	time.Sleep(240 * time.Second)
-
-	return
-}
-
-func test(peer *Peer, torrent *Torrent) (err error) {
-	log.Debugf("Fired!")
-	err = peer.Connect()
-	if err != nil || peer.Conn == nil {
-		return
-	}
-
-	err = peer.SendHandshake(torrent.InfoHash, string(torrent.ClientId))
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-	err = peer.SendUnchoke()
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-	err = peer.SendInterested()
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-	err = peer.RequestBlock(300, 0, uint32(PieceChunkLength))
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-	err = peer.ReadHandshake()
-
-	log.Debugf("Receiving Data...")
-	err = peer.ReceiveData()
-	if err != nil {
-		log.Errorf("%v", err)
-	}
-	peer.ParseData()
-	return
-}*/
-
-func (torrent *Torrent) Test() (err error) {
-	//panic("Not implemented yet!")
 	trackerResponse, err := torrent.Tracker.Peers(
 		torrent.InfoHash,
 		torrent.ClientId,
