@@ -2,6 +2,7 @@ package messages
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 )
 
@@ -70,8 +71,8 @@ type Header struct {
 }
 
 type Message struct {
-	Header Header
-	Data   []byte // Data represents the whole message in binary form, including Length and Id
+	Header  Header
+	Payload []byte
 }
 
 // unchoke: <len=0001><id=1>
@@ -148,4 +149,28 @@ type Cancel struct {
 	PieceIndex  uint32
 	BlockOffset uint32
 	BlockLength uint32
+}
+
+func (m *Message) ToHave() (have *Have, err error) {
+	have = new(Have)
+	have.Header = m.Header
+	err = binary.Read(bytes.NewBuffer(m.Payload), binary.BigEndian, &have.PieceIndex)
+	return
+}
+
+func (m *Message) ToBitArray() (bitArray *BitArray, err error) {
+	bitArray = new(BitArray)
+	bitArray.Header = m.Header
+	bitArray.BitField = m.Payload
+	return
+}
+
+func (m *Message) ToPiece() (piece *Piece, err error) {
+	piece = new(Piece)
+	piece.Header = m.Header
+	// piece: <len=0009+X><id=7><index><begin><block>
+	err = binary.Read(bytes.NewBuffer(m.Payload[:4]), binary.BigEndian, &piece.PieceIndex)
+	err = binary.Read(bytes.NewBuffer(m.Payload[4:8]), binary.BigEndian, &piece.BlockOffset)
+	piece.BlockData = m.Payload[8:]
+	return
 }

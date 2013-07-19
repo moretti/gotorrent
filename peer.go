@@ -1,12 +1,14 @@
 package gotorrent
 
 import (
-	"bytes"
 	log "code.google.com/p/tcgl/applog"
-	"encoding/binary"
 	"github.com/moretti/gotorrent/bitarray"
 	"github.com/moretti/gotorrent/messages"
 	"net"
+)
+
+const (
+	PeerMaxRequests = 16
 )
 
 type Peer struct {
@@ -16,6 +18,8 @@ type Peer struct {
 	bitField     *bitarray.BitArray
 	amInterested bool
 	IsChoked     bool
+
+	RequestsCount int
 }
 
 func NewPeer(
@@ -75,9 +79,8 @@ func (p *Peer) SendRequest(pieceIndex, blockOffset, blockLength int) {
 func (p *Peer) SetKeepAlive() {
 }
 
-func (p *Peer) SetHave(message []byte) {
-	var haveMsg messages.Have
-	err := binary.Read(bytes.NewBuffer(message), binary.BigEndian, &haveMsg)
+func (p *Peer) SetHave(message messages.Message) {
+	haveMsg, err := message.ToHave()
 
 	if err != nil {
 		log.Errorf("Peer %v - Unable to parse the have message: %v", p.String(), err)
@@ -85,7 +88,7 @@ func (p *Peer) SetHave(message []byte) {
 	}
 
 	if int(haveMsg.PieceIndex) >= p.bitField.Len() {
-		log.Errorf("Peer %v - Invalid piece index: %v, piece count: %v", haveMsg.PieceIndex, p.bitField.Len())
+		log.Errorf("Peer %v - Have message, invalid piece index: %v, piece count: %v", p.String(), haveMsg.PieceIndex, p.bitField.Len())
 		return
 	}
 
@@ -93,19 +96,15 @@ func (p *Peer) SetHave(message []byte) {
 	p.bitField.Set(int(haveMsg.PieceIndex))
 }
 
-func (p *Peer) SetBitField(message []byte) {
-	var bitMsg messages.BitArray
-	err := binary.Read(bytes.NewBuffer(message), binary.BigEndian, &bitMsg.Header)
+func (p *Peer) SetBitField(message messages.Message) {
+	bitMsg, err := message.ToBitArray()
 
 	if err != nil {
-		log.Errorf("Peer %v - Unable to parse the bitfield message: %v", p.String(), err)
+		log.Errorf("Peer %v - Unable to parse the bitarray message: %v", p.String(), err)
 		return
 	}
 
-	begin := 5
-	bitMsg.BitField = message[begin:]
 	pieceCount := p.torrent.PieceCount
-
 	if bitCount := (bitMsg.Header.Length - 1) * 8; pieceCount > int(bitCount) {
 		log.Errorf("Peer %v - Invalid bitfield, bit count: %v, piece count: %v", p.String(), bitCount, pieceCount)
 		return
@@ -124,6 +123,7 @@ func (p *Peer) RequestPiece(piece *Piece) {
 		if block == nil {
 			break
 		}
+
 		p.SendRequest(piece.Index(), block.Begin, block.Length)
 	}
 }
@@ -134,10 +134,10 @@ func (p *Peer) AmInterested(activePieces, completedPieces *bitarray.BitArray) (i
 	interested = len(pieces) > 0
 
 	if interested != p.amInterested {
-		p.SendInterested(interested)
 		p.amInterested = interested
+		p.SendInterested(interested)
 	}
 
-	log.Debugf("Peer %v - Those are the indices of the pieces that I don't have: %v", p.String(), pieces)
+	//log.Debugf("Peer %v - Piece indices that I don't have: %v", p.String(), pieces)
 	return
 }
