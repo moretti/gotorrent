@@ -5,6 +5,7 @@ import (
 	log "code.google.com/p/tcgl/applog"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/moretti/gotorrent/messages"
 	"io"
 	"net"
@@ -78,70 +79,81 @@ func (pc *PeerConnection) outMessage(message messages.Message) {
 }
 
 func (pc *PeerConnection) reader() {
-	nBytes := 0
-	n := 0
 	var err error
-	buf := make([]byte, 2048)
-
-	err = pc.readHandshake()
-	if err != nil {
-		log.Debugf("Finished reading from peer %v, err: %v", pc.addr, err)
+	defer func() {
+		log.Debugf("Peer %v - Finished reading, err: %v", pc.addr, err)
 		pc.conn.Close()
+	}()
+
+	if err := pc.readHandshake(); err != nil {
+		return
 	}
+
+	bytesCount := 0
+	buf := make([]byte, 2048)
 
 	for {
 		pc.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		n, err = pc.conn.Read(buf)
+		n, err := pc.conn.Read(buf)
 
 		if err != nil && err != io.EOF {
 			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
-				break
+				return
 			}
 		}
 
 		readed := buf[:n]
 		//log.Debugf("Peer %v - Readed %v bytes", pc.addr, n)
 
-		nBytes += n
+		bytesCount += n
 		pc.data = append(pc.data, readed...)
 
-		//log.Debugf("Peer: %v - Buffer: %v", pc.addr, buf)
-		//log.Debugf("Peer: %v - Readed: %v", pc.addr, readed)
-		//log.Debugf("Peer: %v - Current data: %v", pc.addr, pc.data)
-
 		if len(pc.data) > 4 {
-			//log.Debugf("Peer: %v - Parsing the data", pc.addr)
-			pc.parseData()
+			message, n, err := parseData(pc.data)
+			if err != nil {
+				return
+			}
+			if n > 0 {
+				pc.data = pc.data[n:]
+				//log.Debugf("Peer: %v - Sending message %v", pc.addr, message.Header)
+				pc.outMessage(message)
+			}
 		}
 	}
-
-	log.Debugf("Finished reading from peer %v, err: %v", pc.addr, err)
-	pc.conn.Close()
 }
 
-func (pc *PeerConnection) parseData() {
-	var message messages.Message
-	err := binary.Read(bytes.NewBuffer(pc.data[:4]), binary.BigEndian, &message.Header.Length)
+func parseData(data []byte) (message messages.Message, n int, err error) {
+	n = 0
+	var length uint32
+
+	err = binary.Read(bytes.NewBuffer(data[:4]), binary.BigEndian, &length)
 	if err != nil {
 		log.Errorf("Cannot read the message length: %v", err)
-	}
-
-	if int(message.Header.Length) > len(pc.data) {
-		log.Debugf("Peer: %v - I need more data, message length: %v, data length %v", pc.addr, message.Header.Length, len(pc.data))
 		return
 	}
 
-	message.Data = pc.data[:4]
-	pc.data = pc.data[4:]
+	if length > 30*1024 {
+		err = fmt.Errorf("Whoops, something went wrong, message length is too long: %v", length)
+		return
+	}
+
+	if int(length) > len(data) {
+		//log.Debugf("Peer: %v - I need more data, message length: %v, data length %v", pc.addr, length, len(data))
+		return
+	}
+
+	message = messages.Message{}
+	message.Header.Length = length
+
+	data = data[4:]
+	n += 4
 
 	if message.Header.Length > 0 {
-		message.Header.Id = pc.data[0]
-		message.Data = append(message.Data, pc.data[:message.Header.Length]...)
-
-		pc.data = pc.data[message.Header.Length:]
+		message.Header.Id = data[0]
+		message.Payload = data[1:message.Header.Length]
+		n += int(message.Header.Length)
 	}
-	//log.Debugf("Peer: %v - Sending message %v", pc.addr, message.Header)
-	pc.outMessage(message)
+	return
 }
 
 func (pc *PeerConnection) writer() {

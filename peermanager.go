@@ -1,9 +1,7 @@
 package gotorrent
 
 import (
-	"bytes"
 	log "code.google.com/p/tcgl/applog"
-	"encoding/binary"
 	"github.com/moretti/gotorrent/messages"
 	"math/rand"
 	"net"
@@ -81,11 +79,11 @@ func (pm *PeerManager) handleError(peerError PeerError) {
 
 func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 	message := peerMessage.Message
-	data := peerMessage.Message.Data
 
 	peer, ok := pm.Peers[peerMessage.Addr.String()]
 	if !ok {
 		log.Errorf("Unable to find peer %v", peerMessage.Addr)
+		return
 	}
 
 	if message.Header.Length == 0 {
@@ -103,14 +101,15 @@ func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 		case messages.InterestedId:
 		case messages.NotInterestedId:
 		case messages.HaveId:
-			peer.SetHave(data)
+			peer.SetHave(message)
 			pm.downloadPiece(peer)
 		case messages.BitFieldId:
-			peer.SetBitField(data)
+			peer.SetBitField(message)
 			pm.downloadPiece(peer)
 		case messages.RequestId:
 		case messages.PieceId:
-			pm.decodePiece(message, peer)
+			peer.RequestsCount--
+			pm.processPiece(message, peer)
 		case messages.CancelId:
 		case messages.PortId:
 		default:
@@ -120,7 +119,7 @@ func (pm *PeerManager) processMessage(peerMessage PeerMessage) {
 }
 
 func (pm *PeerManager) downloadPiece(peer *Peer) {
-	if peer.IsChoked {
+	if peer.IsChoked || peer.RequestsCount > PeerMaxRequests {
 		return
 	}
 
@@ -133,20 +132,23 @@ func (pm *PeerManager) downloadPiece(peer *Peer) {
 	pieceIndex := randomChoice(pieceIndices)
 	piece := pm.Torrent.Pieces[pieceIndex]
 
+	peer.RequestsCount++
 	log.Debugf("Requesting piece #%v to peer %v", pieceIndex, peer.String())
 	peer.RequestPiece(piece)
 }
 
-func (pm *PeerManager) decodePiece(message messages.Message, peer *Peer) {
-	var pieceMsg messages.Piece
-	err := binary.Read(bytes.NewBuffer(message.Data), binary.BigEndian, &pieceMsg)
+func (pm *PeerManager) processPiece(message messages.Message, peer *Peer) {
+	pieceMsg, err := message.ToPiece()
+
 	if err != nil {
 		log.Errorf("Peer %v - Unable to parse the piece message: %v", peer.String(), err)
 		return
 	}
-	begin := 9
-	pieceMsg.BlockData = message.Data[begin:]
+
 	log.Debugf("Peer %v - Found a new block - PieceIndex: %v BlockOffset: %v", peer.String(), pieceMsg.PieceIndex, pieceMsg.BlockOffset)
+
+	piece := pm.Torrent.Pieces[pieceMsg.PieceIndex]
+	piece.SetBlock(int(pieceMsg.BlockOffset), pieceMsg.BlockData)
 }
 
 func randomChoice(slice []int) int {
