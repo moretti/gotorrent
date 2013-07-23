@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	// BlockLength is generally a power of two unless it gets truncated by the end of the file.
+	// MaxBlockLength is generally a power of two unless it gets truncated by the end of the file.
 	// All current implementations use 2 15 (32 KB), and close connections which request an amount greater than 2 17.
-	BlockLength = 1024 * 32
+	MaxBlockLength = 1024 * 16
 )
 
 // Piece vs Block:
@@ -30,7 +30,7 @@ type Piece struct {
 func NewPiece(index, length int, hash string) *Piece {
 	p := new(Piece)
 
-	p.completed = bitarray.New(length / BlockLength)
+	p.completed = bitarray.New(length / MaxBlockLength)
 	p.requested = bitarray.New(p.completed.Len())
 
 	p.hash = hash
@@ -43,13 +43,23 @@ func NewPiece(index, length int, hash string) *Piece {
 }
 
 func (p *Piece) SetBlock(begin int, block []byte) {
-	index := begin / BlockLength
+	index := begin / MaxBlockLength
 	if p.completed.IsSet(index) {
 		log.Warningf("Attempt to overwrite data at piece %v, offset %v", p.index, begin)
 		return
 	}
 
-	copy(p.data[begin:len(block)], block)
+	end := begin + len(block)
+
+	if end > len(p.data) || begin < 0 {
+		log.Warningf("Len of block: %v", len(block))
+		log.Warningf("Index: %v", index)
+		log.Warningf("len(data): %v", len(p.data))
+		log.Warningf("Begin: %v", begin)
+		log.Warningf("End: %v", end)
+	}
+
+	copy(p.data[begin:end], block)
 	p.completed.Set(index)
 }
 
@@ -70,15 +80,15 @@ func (p *Piece) NextBlock() *BlockRequest {
 
 	index := indices[0]
 	p.requested.Set(index)
-	lastLength := p.length % BlockLength
+	lastLength := p.length % MaxBlockLength
 
 	blockRequest := new(BlockRequest)
-	blockRequest.Begin = index * BlockLength
+	blockRequest.Begin = index * MaxBlockLength
 
 	if index == p.completed.Len()-1 && lastLength != 0 {
 		blockRequest.Length = lastLength
 	} else {
-		blockRequest.Length = BlockLength
+		blockRequest.Length = MaxBlockLength
 	}
 
 	return blockRequest

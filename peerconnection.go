@@ -85,21 +85,27 @@ func (pc *PeerConnection) reader() {
 		pc.conn.Close()
 	}()
 
-	if err := pc.readHandshake(); err != nil {
+	if err = pc.readHandshake(); err != nil {
 		return
 	}
 
 	bytesCount := 0
-	buf := make([]byte, 2048)
+	buf := make([]byte, MaxBlockLength*2)
 
 	for {
 		pc.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		n, err := pc.conn.Read(buf)
 
 		if err != nil && err != io.EOF {
-			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+			if netErr, ok := err.(net.Error); ok && !netErr.Timeout() {
+				log.Errorf("Peer %v - Err: %v", pc.addr, err)
 				return
 			}
+		}
+
+		if n > len(buf) {
+			err = fmt.Errorf("Whoops, I readed too many bytes %v, my buffer is not big enough", pc.addr, n)
+			return
 		}
 
 		readed := buf[:n]
@@ -114,6 +120,9 @@ func (pc *PeerConnection) reader() {
 				return
 			}
 			if n > 0 {
+				if n > len(pc.data) {
+					log.Errorf("Peer %v - Something went wrong, n > len(data)", pc.addr, n, pc.data)
+				}
 				pc.data = pc.data[n:]
 				//log.Debugf("Peer: %v - Sending message %v", pc.addr, message.Header)
 				pc.outMessage(message)
@@ -132,7 +141,7 @@ func parseData(data []byte) (message messages.Message, n int, err error) {
 		return
 	}
 
-	if length > 30*1024 {
+	if length > MaxBlockLength {
 		err = fmt.Errorf("Whoops, something went wrong, message length is too long: %v", length)
 		return
 	}
@@ -150,7 +159,8 @@ func parseData(data []byte) (message messages.Message, n int, err error) {
 
 	if message.Header.Length > 0 {
 		message.Header.Id = data[0]
-		message.Payload = data[1:message.Header.Length]
+		message.Payload = make([]byte, message.Header.Length-1)
+		copy(message.Payload, data[1:message.Header.Length])
 		n += int(message.Header.Length)
 	}
 	return
